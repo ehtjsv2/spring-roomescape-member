@@ -1,12 +1,20 @@
 let isEditing = false;
-const RESERVATION_API_ENDPOINT = '/reservations';
+const API_ENDPOINT = '/themes';
+const cellFields = ['id', 'name', 'description', 'thumbnail'];
+const createCellFields = ['', createInput(), createInput(), createInput()];
+function createBody(inputs) {
+  return {
+    name: inputs[0].value,
+    description: inputs[1].value,
+    thumbnail: inputs[2].value,
+  };
+}
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('add-button').addEventListener('click', addInputRow);
-
-  requestRead(RESERVATION_API_ENDPOINT)
+  document.getElementById('add-button').addEventListener('click', addRow);
+  requestRead()
       .then(render)
-      .catch(error => console.error('Error fetching reservations:', error));
+      .catch(error => console.error('Error fetching times:', error));
 });
 
 function render(data) {
@@ -16,38 +24,27 @@ function render(data) {
   data.forEach(item => {
     const row = tableBody.insertRow();
 
-    row.insertCell(0).textContent = item.id;
-    row.insertCell(1).textContent = item.name;
-    row.insertCell(2).textContent = item.date;
-    row.insertCell(3).textContent = item.time;
+    cellFields.forEach((field, index) => {
+      row.insertCell(index).textContent = item[field];
+    });
 
     const actionCell = row.insertCell(row.cells.length);
     actionCell.appendChild(createActionButton('삭제', 'btn-danger', deleteRow));
   });
 }
 
-function createActionButton(label, className, eventListener) {
-  const button = document.createElement('button');
-  button.textContent = label;
-  button.classList.add('btn', className, 'mr-2');
-  button.addEventListener('click', eventListener);
-  return button;
-}
-
-function addInputRow() {
+function addRow() {
   if (isEditing) return;  // 이미 편집 중인 경우 추가하지 않음
 
   const tableBody = document.getElementById('table-body');
   const row = tableBody.insertRow();
   isEditing = true;
 
-  const nameInput = createInput('text');
-  const dateInput = createInput('date');
-  const timeInput = createInput('time');
+  createAddField(row);
+}
 
-  const cellFieldsToCreate = ['', nameInput, dateInput, timeInput];
-
-  cellFieldsToCreate.forEach((field, index) => {
+function createAddField(row) {
+  createCellFields.forEach((field, index) => {
     const cell = row.insertCell(index);
     if (typeof field === 'string') {
       cell.textContent = field;
@@ -64,9 +61,8 @@ function addInputRow() {
   }));
 }
 
-function createInput(type) {
+function createInput() {
   const input = document.createElement('input');
-  input.type = type;
   input.className = 'form-control';
   return input;
 }
@@ -80,21 +76,11 @@ function createActionButton(label, className, eventListener) {
 }
 
 function saveRow(event) {
-  // 이벤트 전파를 막는다
-  event.stopPropagation();
-
   const row = event.target.parentNode.parentNode;
-  const nameInput = row.querySelector('input[type="text"]');
-  const dateInput = row.querySelector('input[type="date"]');
-  const timeInput = row.querySelector('input[type="time"]');
+  const inputs = row.querySelectorAll('input');
+  const body = createBody(inputs);
 
-  const reservation = {
-    name: nameInput.value,
-    date: dateInput.value,
-    time: timeInput.value
-  };
-
-  requestCreate(reservation)
+  requestCreate(body)
       .then(() => {
         location.reload();
       })
@@ -105,24 +91,35 @@ function saveRow(event) {
 
 function deleteRow(event) {
   const row = event.target.closest('tr');
-  const reservationId = row.cells[0].textContent;
+  const id = row.cells[0].textContent;
 
-  requestDelete(reservationId)
+  requestDelete(id)
       .then(() => row.remove())
       .catch(error => console.error('Error:', error));
 }
 
-function requestCreate(reservation) {
+
+// request
+
+function requestCreate(data) {
   const requestOptions = {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(reservation)
+    body: JSON.stringify(data)
   };
 
-  return fetch(RESERVATION_API_ENDPOINT, requestOptions)
+  return fetch(API_ENDPOINT, requestOptions)
       .then(response => {
         if (response.status === 201) return response.json();
         throw new Error('Create failed');
+      });
+}
+
+function requestRead() {
+  return fetch(API_ENDPOINT)
+      .then(response => {
+        if (response.status === 200) return response.json();
+        throw new Error('Read failed');
       });
 }
 
@@ -131,16 +128,8 @@ function requestDelete(id) {
     method: 'DELETE',
   };
 
-  return fetch(`${RESERVATION_API_ENDPOINT}/${id}`, requestOptions)
+  return fetch(`${API_ENDPOINT}/${id}`, requestOptions)
       .then(response => {
         if (response.status !== 204) throw new Error('Delete failed');
-      });
-}
-
-function requestRead(endpoint) {
-  return fetch(endpoint)
-      .then(response => {
-        if (response.status === 200) return response.json();
-        throw new Error('Read failed');
       });
 }
